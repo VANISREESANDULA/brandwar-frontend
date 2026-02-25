@@ -1,0 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-size: 14px; /* Scaled down from 16px to make the UI feel cleaner/smaller */
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 font-body antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display tracking-tight;
+  }
+}
+
+@layer components {
+  .stat-card {
+    @apply bg-white rounded-xl shadow-sm border border-slate-200 p-4 transition-all duration-300 hover:shadow-md hover:border-slate-300;
+  }
+
+  .btn-primary {
+    background-color: var(--primary-color);
+    @apply text-white px-6 py-2.5 rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-lg hover:brightness-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply bg-slate-100 text-slate-700 px-6 py-2.5 rounded-lg font-medium transition-all duration-200 hover:bg-slate-200 active:scale-95;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white px-6 py-2.5 rounded-lg font-medium transition-all duration-200 hover:bg-red-700 hover:shadow-lg active:scale-95;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-2.5 border border-slate-300 rounded-lg outline-none transition-all duration-200;
+  }
+
+  .input-field:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color), transparent 80%);
+  }
+
+  .sidebar-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 cursor-pointer;
+  }
+
+  .sidebar-item-active {
+    background-color: var(--primary-color);
+    @apply text-white font-medium shadow-md;
+  }
+
+  .sidebar-item-inactive {
+    @apply text-slate-600 hover:bg-slate-100;
+  }
+
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4;
+  }
+
+  .modal-content {
+    @apply bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto;
+  }
+
+  .table-container {
+    @apply bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden;
+  }
+
+  .badge {
+    @apply px-3 py-1 rounded-full text-xs font-medium;
+  }
+
+  .badge-active {
+    @apply bg-green-100 text-green-700;
+  }
+
+  .badge-inactive {
+    @apply bg-gray-100 text-gray-700;
+  }
+
+  .badge-hold {
+    @apply bg-amber-100 text-amber-700;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
