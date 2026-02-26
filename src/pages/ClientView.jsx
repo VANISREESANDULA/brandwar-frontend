@@ -8,14 +8,19 @@ import CreateBlogModal from '../components/CreateBlogModal';
 import CreateNewsModal from '../components/CreateNewsModal';
 import CreateVideoModal from '../components/CreateVideoModal';
 import CreateImageModal from '../components/CreateImageModal';
+import EditFolderModal from '../components/EditFolderModal';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 import BlogListing from '../components/content/BlogListing';
 import NewsListing from '../components/content/NewsListing';
 import VideoListing from '../components/content/VideoListing';
 import ImageListing from '../components/content/ImageListing';
 
-const ClientView = () => {
+import { slugify } from '../utils/slugify';
+
+const ClientView = ({ forceModule }) => {
   const { id } = useParams();
+  // console.log("ID:", id);
+  const { companySlug, type } = useParams();
   const navigate = useNavigate();
   const { isSuperAdmin } = useAuth();
   const [client, setClient] = useState(null);
@@ -31,13 +36,22 @@ const ClientView = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
+  const [isTwoStepDelete, setIsTwoStepDelete] = useState(false);
+  const [isEditFolderOpen, setIsEditFolderOpen] = useState(false);
+  const [folderToEdit, setFolderToEdit] = useState(null);
+  // console.log("CLIENT DATA:", client);
+  useEffect(() => {
+    if (forceModule) {
+      setActiveModule(forceModule === 'gallery' ? type || 'images' : forceModule);
+    }
+  }, [forceModule, type]);
 
   useEffect(() => {
-    const fetchClient = async () => {
+    const fetchClientBySlug = async () => {
       try {
         // Since /admins/:id does not exist on backend, fetch all and find the client locally
         const response = await api.get('/admins');
-        const clientData = response.data.find(c => c.id === id);
+        const clientData = response.data.find(c => slugify(c.company_name) === companySlug);
 
         if (clientData) {
           // Map snake_case to camelCase
@@ -67,18 +81,30 @@ const ClientView = () => {
       }
     };
 
-    fetchClient();
-  }, [id]);
+    fetchClientBySlug();
+  }, [companySlug]);
 
-  // Auto-select first available module
+  // Fetch module data when activeModule changes or client is resolved
   useEffect(() => {
-    if (client && !activeModule) {
-      if (client.moduleBlog) handleModuleSelect('blogs');
-      else if (client.moduleNews) handleModuleSelect('news');
-      else if (client.moduleVideos) handleModuleSelect('videos');
-      else if (client.moduleImages) handleModuleSelect('images');
+    if (activeModule && client) {
+      handleModuleSelect(activeModule, false);
     }
-  }, [client]);
+  }, [activeModule, client]);
+
+  // Auto-select first available module if none active
+  useEffect(() => {
+    if (client && !activeModule && !forceModule) {
+      let firstModule = null;
+      if (client.moduleBlog) firstModule = 'blogs';
+      else if (client.moduleNews) firstModule = 'news';
+      else if (client.moduleVideos) firstModule = 'videos';
+      else if (client.moduleImages) firstModule = 'images';
+
+      if (firstModule) {
+        handleModuleSelect(firstModule);
+      }
+    }
+  }, [client, activeModule, forceModule]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -91,8 +117,15 @@ const ClientView = () => {
 
   // Helper to fix broken backend URLs (absolute paths)
   const getValidImageUrl = (url) => {
-
     if (!url) return null;
+
+    // Handle production URL issues in local dev
+    if (url.includes("brandwar.com")) {
+      const parts = url.split("/");
+      const fileName = parts[parts.length - 1];
+      // Try to load it from local uploads if it's supposed to be a logo
+      return `http://localhost:4000/uploads/${fileName}`;
+    }
 
     // Already full URL
     if (url.startsWith("http")) {
@@ -107,28 +140,40 @@ const ClientView = () => {
 
     return null;
   };
-  // const getValidImageUrl = (url) => {
-  //   if (!url) return null;
-  //   if (typeof url !== 'string') return url;
-  //   // Fix absolute path issue from backend
-  //   if (url.includes('http://localhost:4000/C:')) {
-  //     const parts = url.split('/uploads/');
-  //     return parts.length > 1 ? `http://localhost:4000/uploads/${parts[1]}` : url;
-  //   }
-  //   // Handle relative uploads/ path
-  //   if (url.startsWith('uploads/')) {
-  //     return `http://localhost:4000/${url}`;
-  //   }
-  //   return url;
-  // };
 
-  const handleModuleSelect = async (module) => {
+  const getYouTubeThumbnail = (url) => {
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    if (match && match[2].length === 11) {
+      return `https://img.youtube.com/vi/${match[2]}/maxresdefault.jpg`;
+    }
+    return null;
+  };
+
+  const handleModuleSelect = async (module, shouldNavigate = true) => {
+    if (shouldNavigate) {
+      if (module === 'blogs') navigate(`/${companySlug}/blogs`);
+      else if (module === 'news') navigate(`/${companySlug}/news`);
+      else if (module === 'videos') navigate(`/${companySlug}/gallery/videos`);
+      else if (module === 'images') navigate(`/${companySlug}/gallery/images`);
+      else navigate(`/${companySlug}`);
+      return;
+    }
     setActiveModule(module);
     setModuleLoading(true);
+    setModuleData([]); // Clear old data to force UI refresh
+    // console.log("ID:", client?.id);
     try {
       // Scoped fetching (if backend supports userId filtering, otherwise we filter locally)
       const endpoint = module === 'blogs' ? '/blogs' : module === 'news' ? '/news' : module === 'videos' ? '/videofolders' : '/imagefolders';
-      const response = await api.get(endpoint);
+      const response = await api.get(endpoint, {
+        params: {
+          adminId: client?.id,
+          _t: Date.now()
+        }
+      });
+      // console.log("RESPONSE DATA:", response.data);
 
       // Filter data for this specific client
 
@@ -139,24 +184,19 @@ const ClientView = () => {
       if (module === 'blogs' || module === 'news') {
         // Backend nests userId in user.id due to selectivity config
         data = data.filter(item => {
-          const match = item.user?.id === id || item.userId === id;
-          if (!match) {
-            console.log(`Skipping item ${item.title}: user.id(${item.user?.id}) !== current.id(${id})`);
-          }
+          const match = item.user?.id === client.id || item.userId === client.id;
           return match;
         });
       } else {
         // Videos and Images are folder-based
         data = data.filter(folder => {
-          const match = folder.userId === id;
-          if (!match) {
-            console.log(`Skipping folder ${folder.title}: folder.userId(${folder.userId}) !== current.id(${id})`);
-          }
+          const match = folder.userId === client.id;
           return match;
         });
       }
 
       // console.log("FINAL FILTERED DATA:", data);
+      // console.log("DATA SET:", data);
       setModuleData(data);
     } catch (error) {
       setToast({ message: `Failed to load ${module}`, type: 'error' });
@@ -165,28 +205,58 @@ const ClientView = () => {
     }
   };
 
-  const handleDelete = (itemId, type) => {
-    setItemToDelete({ id: itemId, type });
+  const handleDelete = (item, isFolder = false) => {
+    setItemToDelete({ ...item, isFolder });
+    setIsTwoStepDelete(isFolder);
     setIsDeleteModalOpen(true);
   };
 
   const confirmDelete = async () => {
     if (!itemToDelete) return;
-    const { id: itemId, type } = itemToDelete;
+    const { id: itemId, isFolder } = itemToDelete;
+    const type = activeModule;
 
     try {
-      const endpoint = type === 'blogs' ? `/blogs/${itemId}` : `/news/${itemId}`;
+      let endpoint = '';
+      if (isFolder) {
+        endpoint = type === 'videos' ? `/videofolders/${itemId}` : `/imagefolders/${itemId}`;
+      } else {
+        endpoint = type === 'blogs' ? `/blogs/${itemId}` : `/news/${itemId}`;
+      }
+
       await api.delete(endpoint);
-      setToast({ message: `${type.slice(0, -1).charAt(0).toUpperCase() + type.slice(1, -1)} deleted successfully`, type: 'success' });
-      handleModuleSelect(activeModule);
+      setToast({ message: `${isFolder ? 'Folder' : type.slice(0, -1).charAt(0).toUpperCase() + type.slice(1, -1)} deleted successfully`, type: 'success' });
+      handleModuleSelect(activeModule, false);
     } catch (error) {
-      setToast({ message: 'Failed to delete item', type: 'error' });
+      console.error("Delete failed:", error);
+      setToast({ message: 'Failed to delete', type: 'error' });
     }
   };
 
   const handleEdit = (item) => {
     setEditingItem(item);
     setIsCreateOpen(true);
+  };
+
+  const handleDeleteClick = (e, item, isFolder = false) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    handleDelete(item, isFolder);
+  };
+
+  const handleEditClick = (e, item, isFolder = false) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (isFolder) {
+      setFolderToEdit(item);
+      setIsEditFolderOpen(true);
+    } else {
+      handleEdit(item);
+    }
   };
 
   if (loading) {
@@ -319,9 +389,11 @@ const ClientView = () => {
 
         {/* Modules */}
         <section>
-          <h2 className="text-xl font-bold text-slate-900 border-b border-slate-100 pb-3 mb-6 flex items-center gap-2">
-            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-            Enabled Modules
+          <h2 className="text-xl font-bold text-slate-900 border-b border-slate-100 pb-3 mb-6 flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+              Enabled Modules
+            </span>
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Blog Module */}
@@ -335,15 +407,15 @@ const ClientView = () => {
               <div className="flex items-center justify-between mb-2">
                 <span className="font-bold text-slate-700">Blog Module</span>
                 {client.moduleBlog ? (
-                  <span className="w-3 h-3 rounded-full bg-green-500 shadow-sm shadow-green-200"></span>
+                  <span className="w-2 h-2 rounded-full bg-green-500 shadow-sm shadow-green-200"></span>
                 ) : (
-                  <span className="w-3 h-3 rounded-full bg-slate-300"></span>
+                  <span className="w-2 h-2 rounded-full bg-slate-300"></span>
                 )}
               </div>
               {client.moduleBlog && (
-                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-blue-100/50">
-                  <span className="text-xs text-slate-500">Theme Color:</span>
-                  <div className="w-4 h-4 rounded shadow-sm" style={{ backgroundColor: client.blogColor }}></div>
+                <div className="flex items-center gap-2 mt-2 pt-2 border-blue-100/50">
+                  {/* <span className="text-xs text-slate-500">Theme Color:</span> */}
+                  <div className="w-2 h-2 rounded shadow-sm" style={{ backgroundColor: client.blogColor }}></div>
                 </div>
               )}
             </button>
@@ -365,8 +437,8 @@ const ClientView = () => {
                 )}
               </div>
               {client.moduleNews && (
-                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-red-100/50">
-                  <span className="text-xs text-slate-500">Theme Color:</span>
+                <div className="flex items-center gap-2 mt-2 pt-2 border-red-100/50">
+                  {/* <span className="text-xs text-slate-500">Theme Color:</span> */}
                   <div className="w-4 h-4 rounded shadow-sm" style={{ backgroundColor: client.newsColor }}></div>
                 </div>
               )}
@@ -389,8 +461,8 @@ const ClientView = () => {
                 )}
               </div>
               {client.moduleVideos && (
-                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-purple-100/50">
-                  <span className="text-xs text-slate-500">Theme Color:</span>
+                <div className="flex items-center gap-2 mt-2 pt-2  border-purple-100/50">
+                  {/* <span className="text-xs text-slate-500">Theme Color:</span> */}
                   <div className="w-4 h-4 rounded shadow-sm" style={{ backgroundColor: client.videosColor }}></div>
                 </div>
               )}
@@ -413,8 +485,8 @@ const ClientView = () => {
                 )}
               </div>
               {client.moduleImages && (
-                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-teal-100/50">
-                  <span className="text-xs text-slate-500">Theme Color:</span>
+                <div className="flex items-center gap-2 mt-2 pt-2  border-teal-100/50">
+                  {/* <span className="text-xs text-slate-500">Theme Color:</span> */}
                   <div className="w-4 h-4 rounded shadow-sm" style={{ backgroundColor: client.imagesColor }}></div>
                 </div>
               )}
@@ -422,53 +494,27 @@ const ClientView = () => {
           </div>
         </section>
 
-        {/* Sticky Module Navigation Wrapper */}
-        <div className="relative mt-8 min-h-[64px]">
-          {activeModule && (
-            <div className={`transition-all duration-300 ${isSticky ? 'fixed top-14 left-0 right-0 z-40 bg-white/80 backdrop-blur-md shadow-sm border-b border-slate-200 px-8 py-2 lg:ml-64' : 'relative py-4 border-t border-slate-100'}`}>
-              <div className="max-w-7xl mx-auto flex items-center justify-between overflow-x-auto scrollbar-hide">
-                <div className="flex items-center gap-1 sm:gap-4 flex-nowrap min-w-max">
-                  <div className="flex items-center gap-1 sm:gap-4 flex-nowrap min-w-max">
-                    {[
-                      { id: 'blogs', label: 'Blogs', icon: '📝', color: 'blue', enabled: client.moduleBlog },
-                      { id: 'news', label: 'News', icon: '📰', color: 'red', enabled: client.moduleNews },
-                      { id: 'videos', label: 'Videos', icon: '🎥', color: 'purple', enabled: client.moduleVideos },
-                      { id: 'images', label: 'Images', icon: '🖼️', color: 'teal', enabled: client.moduleImages }
-                    ].filter(m => m.enabled).map((m) => (
-                      <button
-                        key={m.id}
-                        onClick={() => handleModuleSelect(m.id)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeModule === m.id
-                          ? `bg-${m.color}-100 text-${m.color}-600`
-                          : 'text-slate-500 hover:bg-slate-100'
-                          }`}
-                      >
-                        <span>{m.icon}</span>
-                        <span className="uppercase tracking-widest text-[10px]">{m.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    setEditingItem(null);
-                    setIsCreateOpen(true);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all shrink-0 ml-4 shadow-lg shadow-slate-200"
-                >
-                  <span>➕</span>
-                  <span className="uppercase tracking-widest text-[10px]">Add {activeModule.slice(0, -1)}</span>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Module Content Area */}
 
         {activeModule && (
           <div className="mt-6 animate-slide-up bg-slate-50/30 rounded-3xl p-6 border border-slate-100">
+            <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-200/50">
+              <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
+                <span>{activeModule === 'blogs' ? '📝' : activeModule === 'news' ? '📰' : activeModule === 'videos' ? '🎥' : '🖼️'}</span>
+                {activeModule} Management
+              </h3>
+              <button
+                onClick={() => {
+                  setEditingItem(null);
+                  setIsCreateOpen(true);
+                }}
+                className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-2xl text-xs font-black hover:bg-slate-800 hover:scale-105 transition-all shadow-xl shadow-slate-200"
+              >
+                <span>➕</span>
+                <span className="uppercase tracking-widest">Add {activeModule.slice(0, -1)}</span>
+              </button>
+            </div>
 
             {moduleLoading ? (
 
@@ -482,23 +528,23 @@ const ClientView = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
                 {(activeModule === 'blogs' || activeModule === 'news') &&
-                  moduleData.map(item => (
+                  moduleData.map((item) => (
                     activeModule === 'blogs' ? (
                       <BlogListing
                         key={item.id}
                         item={item}
                         onDetails={(i) => { setSelectedItem(i); setIsDetailOpen(true); }}
                         onEdit={handleEdit}
-                        onDelete={(id) => handleDelete(id, 'blogs')}
+                        onDelete={() => handleDelete(item, false)}
                         getValidImageUrl={getValidImageUrl}
                       />
                     ) : (
                       <NewsListing
-                        key={item.id}
+                        key={`${item.id}-${item.contents?.find(c => c.type === 'image')?.content || 'noimg'}`}
                         item={item}
                         onDetails={(i) => { setSelectedItem(i); setIsDetailOpen(true); }}
                         onEdit={handleEdit}
-                        onDelete={(id) => handleDelete(id, 'news')}
+                        onDelete={() => handleDelete(item, false)}
                         getValidImageUrl={getValidImageUrl}
                       />
                     )
@@ -506,50 +552,115 @@ const ClientView = () => {
                 }
 
                 {activeModule === 'videos' &&
-                  moduleData.map(folder => (
-                    <Link
-                      key={folder.id}
-                      to={`/clients/${id}/gallery/videos/${folder.id}/${encodeURIComponent(folder.title)}`}
-                      className="group relative bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-xl transition-all aspect-video flex flex-col"
-                    >
-                      <div className="flex-1 bg-slate-900 flex items-center justify-center relative overflow-hidden">
-                        <span className="text-4xl z-10">🎥</span>
-                        <div className="absolute inset-0 bg-blue-600/20 group-hover:bg-blue-600/40 transition-colors" />
-                      </div>
-                      <div className="p-4 bg-white border-t border-slate-50">
-                        <h4 className="font-bold text-slate-900 uppercase tracking-widest text-xs truncate">{folder.title}</h4>
-                        <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest">
-                          {folder.videos?.length || 0} Videos • View Folder
-                        </p>
-                      </div>
-                    </Link>
-                  ))
+                  moduleData.map(folder => {
+                    const latestVideo = folder.videos?.[0];
+                    const thumbnail = latestVideo ? getYouTubeThumbnail(latestVideo.url) : null;
+
+                    return (
+                      <Link
+                        key={folder.id}
+                        to={`/${companySlug}/gallery/videos/${folder.id}/${encodeURIComponent(folder.title)}`}
+                        className="group relative bg-slate-900 rounded-3xl shadow-xl border border-slate-200 overflow-hidden hover:shadow-2xl hover:scale-[1.02] transition-all aspect-video flex flex-col"
+                      >
+                        <div className="absolute inset-0 z-0">
+                          {thumbnail ? (
+                            <img
+                              src={thumbnail}
+                              alt=""
+                              className="w-full h-full object-cover opacity-60 group-hover:opacity-80 group-hover:scale-110 transition-all duration-700"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center opacity-40">
+                              <span className="text-4xl text-white/20">🎥</span>
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent z-1" />
+                        </div>
+
+                        <div className="relative z-10 flex-1 flex flex-col justify-end p-6">
+                          <div className="flex items-end justify-between">
+                            <div className="space-y-1">
+                              <h4 className="font-black text-white text-xl uppercase tracking-tighter drop-shadow-lg group-hover:translate-x-1 transition-transform">{folder.title}</h4>
+                              <p className="text-[10px] text-white/70 font-bold uppercase tracking-[0.2em] drop-shadow-md">
+                                {folder.videos?.length || 0} Videos <span className="mx-1">•</span> View Folder
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
+                              <button
+                                onClick={(e) => handleEditClick(e, folder, true)}
+                                className="w-10 h-10 bg-white/10 hover:bg-blue-600 backdrop-blur-md text-white rounded-xl flex items-center justify-center transition-all border border-white/20 shadow-lg"
+                                title="Edit Folder"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                              </button>
+                              <button
+                                onClick={(e) => handleDeleteClick(e, folder, true)}
+                                className="w-10 h-10 bg-white/10 hover:bg-red-600 backdrop-blur-md text-white rounded-xl flex items-center justify-center transition-all border border-white/20 shadow-lg"
+                                title="Delete Folder"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })
                 }
 
                 {activeModule === 'images' &&
                   moduleData.map(folder => (
                     <Link
                       key={folder.id}
-                      to={`/clients/${id}/gallery/images/${folder.id}/${encodeURIComponent(folder.title)}`}
-                      className="group relative bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-xl transition-all aspect-video flex flex-col"
+                      to={`/${companySlug}/gallery/images/${folder.id}/${encodeURIComponent(folder.title)}`}
+                      className="group relative bg-slate-100 rounded-3xl shadow-xl border border-slate-200 overflow-hidden hover:shadow-2xl hover:scale-[1.02] transition-all aspect-video flex flex-col"
                     >
-                      <div className="flex-1 bg-slate-100 flex items-center justify-center relative overflow-hidden">
+                      {/* Background Image */}
+                      <div className="absolute inset-0 z-0">
                         {folder.images?.[0] ? (
                           <img
                             src={getValidImageUrl(folder.images[0].url)}
                             alt=""
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            className="w-full h-full object-cover opacity-70 group-hover:opacity-90 group-hover:scale-110 transition-all duration-700"
                           />
                         ) : (
-                          <span className="text-4xl z-10">🖼️</span>
+                          <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center opacity-40">
+                            <span className="text-4xl text-slate-300">🖼️</span>
+                          </div>
                         )}
-                        <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
+                        {/* Gradient Overlay (Darker for light images) */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent z-1" />
                       </div>
-                      <div className="p-4 bg-white border-t border-slate-50">
-                        <h4 className="font-bold text-slate-900 uppercase tracking-widest text-xs truncate">{folder.title}</h4>
-                        <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest">
-                          {folder.images?.length || 0} Images • View Gallery
-                        </p>
+
+                      {/* Card Info Overlay */}
+                      <div className="relative z-10 flex-1 flex flex-col justify-end p-6">
+                        <div className="flex items-end justify-between">
+                          <div className="space-y-1">
+                            <h4 className="font-black text-white text-xl uppercase tracking-tighter drop-shadow-lg group-hover:translate-x-1 transition-transform">{folder.title}</h4>
+                            <p className="text-[10px] text-white/70 font-bold uppercase tracking-[0.2em] drop-shadow-md">
+                              {folder.images?.length || 0} Images <span className="mx-1">•</span> View Gallery
+                            </p>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
+                            <button
+                              onClick={(e) => handleEditClick(e, folder, true)}
+                              className="w-10 h-10 bg-white/10 hover:bg-teal-600 backdrop-blur-md text-white rounded-xl flex items-center justify-center transition-all border border-white/20 shadow-lg"
+                              title="Edit Folder"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteClick(e, folder, true)}
+                              className="w-10 h-10 bg-white/10 hover:bg-red-600 backdrop-blur-md text-white rounded-xl flex items-center justify-center transition-all border border-white/20 shadow-lg"
+                              title="Delete Folder"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </Link>
                   ))
@@ -590,10 +701,10 @@ const ClientView = () => {
             setIsCreateOpen(false);
             setEditingItem(null);
           }}
-          clientId={id}
+          clientId={client?.id}
           initialData={editingItem}
           onSuccess={() => {
-            handleModuleSelect('blogs');
+            handleModuleSelect('blogs', false);
             setToast({ message: editingItem ? 'Blog updated successfully' : 'Blog created successfully', type: 'success' });
             setEditingItem(null);
           }}
@@ -604,31 +715,45 @@ const ClientView = () => {
             setIsCreateOpen(false);
             setEditingItem(null);
           }}
-          clientId={id}
+          clientId={client?.id}
           initialData={editingItem}
           onSuccess={() => {
-            handleModuleSelect('news');
-            setToast({ message: editingItem ? 'News updated successfully' : 'News published successfully', type: 'success' });
+            const isEditing = !!editingItem;
             setEditingItem(null);
+            setIsCreateOpen(false);
+            setTimeout(() => {
+              handleModuleSelect('news', false);
+              setToast({ message: isEditing ? 'News updated successfully' : 'News published successfully', type: 'success' });
+            }, 500);
           }}
         />
         <CreateVideoModal
           isOpen={isCreateOpen && activeModule === 'videos'}
           onClose={() => setIsCreateOpen(false)}
-          clientId={id}
+          clientId={client?.id}
           onSuccess={() => {
-            handleModuleSelect('videos');
+            handleModuleSelect('videos', false);
             setToast({ message: 'Video added successfully', type: 'success' });
           }}
         />
         <CreateImageModal
           isOpen={isCreateOpen && activeModule === 'images'}
           onClose={() => setIsCreateOpen(false)}
-          clientId={id}
+          clientId={client?.id}
           onSuccess={() => {
-            handleModuleSelect('images');
+            handleModuleSelect('images', false);
             setToast({ message: 'Image uploaded successfully', type: 'success' });
           }}
+        />
+        <EditFolderModal
+          isOpen={isEditFolderOpen}
+          onClose={() => setIsEditFolderOpen(false)}
+          onSuccess={() => {
+            handleModuleSelect(activeModule, false);
+            setToast({ message: 'Folder updated successfully', type: 'success' });
+          }}
+          folder={folderToEdit}
+          type={activeModule}
         />
         <DeleteConfirmationModal
           isOpen={isDeleteModalOpen}
@@ -637,8 +762,11 @@ const ClientView = () => {
             setItemToDelete(null);
           }}
           onConfirm={confirmDelete}
-          title={`Delete ${itemToDelete?.type?.slice(0, -1)}?`}
-          message={`Are you sure you want to delete this ${itemToDelete?.type?.slice(0, -1)}? This action cannot be undone.`}
+          title={itemToDelete?.isFolder ? 'Delete Folder?' : 'Delete Item?'}
+          message={itemToDelete?.isFolder
+            ? `Are you sure you want to delete "${itemToDelete?.title}"? This will remove all items inside.`
+            : 'Are you sure you want to delete this item?'}
+          twoStep={isTwoStepDelete}
         />
       </div>
     </div>

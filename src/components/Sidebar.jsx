@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { slugify } from '../utils/slugify';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const { user, isSuperAdmin } = useAuth();
@@ -14,7 +15,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     { path: '/profile', label: 'Profile', icon: '👤' },
   ] : [
     { path: '/dashboard', label: 'Overview', icon: '📊' },
-    { path: `/clients/${user?.id}`, label: 'My Content', icon: '📝' },
+    { path: `/${slugify(user?.company_name || '')}`, label: 'My Content', icon: '📝' },
     { path: '/requests', label: 'Requests', icon: '📋' },
     { path: '/profile', label: 'Profile', icon: '👤' },
   ];

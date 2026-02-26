@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import Toast from '../components/Toast';
+import { slugify } from '../utils/slugify';
 
 const StatCard = ({ title, value, icon, color, trend, isSuperAdmin }) => (
   <div className={`stat-card p-3 sm:p-4 group hover:scale-[1.02] transition-transform duration-200`}>
@@ -19,6 +21,7 @@ const StatCard = ({ title, value, icon, color, trend, isSuperAdmin }) => (
 
 const Dashboard = () => {
   const { user, isSuperAdmin } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalClients: 0,
     activeClients: 0,
@@ -216,7 +219,7 @@ const Dashboard = () => {
           <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
             {!isSuperAdmin && (
               <button
-                onClick={() => window.location.href = `/clients/${user.id}`}
+                onClick={() => navigate(`/${slugify(user?.company_name || '')}`)}
                 className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/50 transition-all group text-left shadow-sm"
               >
                 <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-lg shrink-0 group-hover:scale-110 transition-transform">
@@ -231,7 +234,7 @@ const Dashboard = () => {
             {isSuperAdmin && (
               <>
                 <button
-                  onClick={() => window.location.href = '/add-client'}
+                  onClick={() => navigate('/add-client')}
                   className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/50 transition-all group text-left shadow-sm"
                 >
                   <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-lg shrink-0 group-hover:scale-110 transition-transform">
@@ -243,7 +246,7 @@ const Dashboard = () => {
                   </div>
                 </button>
                 <button
-                  onClick={() => window.location.href = '/clients'}
+                  onClick={() => navigate('/clients')}
                   className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/50 transition-all group text-left shadow-sm"
                 >
                   <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-lg shrink-0 group-hover:scale-110 transition-transform">
@@ -257,7 +260,7 @@ const Dashboard = () => {
               </>
             )}
             <button
-              onClick={() => window.location.href = '/profile'}
+              onClick={() => navigate('/profile')}
               className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-amber-200 hover:bg-amber-50/50 transition-all group text-left shadow-sm"
             >
               <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-lg shrink-0 group-hover:scale-110 transition-transform">

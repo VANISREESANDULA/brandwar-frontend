@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 
 const CreateVideoModal = ({ isOpen, onClose, onSuccess, clientId }) => {
+    // console.log("Client IDDDDDDDDD:", clientId);
     const [folders, setFolders] = useState([]);
     const [selectedFolderId, setSelectedFolderId] = useState('');
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
@@ -17,29 +18,30 @@ const CreateVideoModal = ({ isOpen, onClose, onSuccess, clientId }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    useEffect(() => {
-        if (isOpen) {
-            fetchFolders();
-        }
-    }, [isOpen]);
+    // useEffect(() => {
+    //     if (isOpen) {
+    //         fetchFolders();
+    //     }
+    // }, [isOpen]);
 
-    const fetchFolders = async () => {
-        try {
-            const response = await api.get('/videos');
-            setFolders(response.data);
-            if (response.data.length > 0 && !selectedFolderId) {
-                setSelectedFolderId(response.data[0].id);
-            }
-        } catch (err) {
-            console.error('Failed to fetch folders');
-        }
-    };
+    // const fetchFolders = async () => {
+    //     try {
+    //         const response = await api.get('/videofolders');
+    //         setFolders(response.data);
+    //         console.log(response.data);
+    //         if (response.data.length > 0 && !selectedFolderId) {
+    //             setSelectedFolderId(response.data[0].id);
+    //         }
+    //     } catch (err) {
+    //         console.error('Failed to fetch folders');
+    //     }
+    // };
 
     const handleCreateFolder = async () => {
         if (!newFolderTitle.trim()) return;
         setLoading(true);
         try {
-            const response = await api.post('/videos', { title: newFolderTitle, adminId: clientId });
+            const response = await api.post(`/videofolders`, { title: newFolderTitle, adminId: clientId });
             setFolders([response.data, ...folders]);
             setSelectedFolderId(response.data.id);
             setIsCreatingFolder(false);
@@ -61,7 +63,7 @@ const CreateVideoModal = ({ isOpen, onClose, onSuccess, clientId }) => {
         setError('');
 
         try {
-            await api.post(`/videos/${selectedFolderId}/videos`, formData);
+            await api.post(`/videofolders/${selectedFolderId}/`, formData);
             onSuccess();
             onClose();
             setFormData({ title: '', language: 'English', location: '', url: '' });

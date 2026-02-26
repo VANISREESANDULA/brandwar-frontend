@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 const BlogListing = ({ item, onEdit, onDelete, getValidImageUrl }) => {
-    const { id: clientId } = useParams();
+    const { companySlug } = useParams();
     const imageBlock = item.contents?.find(c => c.type === "image");
     const imageUrl = imageBlock ? getValidImageUrl(imageBlock.content) : null;
 
@@ -31,7 +31,7 @@ const BlogListing = ({ item, onEdit, onDelete, getValidImageUrl }) => {
                 </p>
                 <div className="flex gap-2">
                     <Link
-                        to={`/clients/${clientId}/blogs/${item.slug}`}
+                        to={`/${companySlug}/blogs/${item.slug}`}
                         className="flex-1 py-2 rounded-xl border border-blue-200 text-blue-600 hover:bg-blue-50 font-bold text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1"
                     >
                         Details

@@ -11,29 +11,29 @@ const CreateImageModal = ({ isOpen, onClose, onSuccess, clientId }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    useEffect(() => {
-        if (isOpen) {
-            fetchFolders();
-        }
-    }, [isOpen]);
+    // useEffect(() => {
+    //     if (isOpen) {
+    //         fetchFolders();
+    //     }
+    // }, [isOpen]);
 
-    const fetchFolders = async () => {
-        try {
-            const response = await api.get('/images');
-            setFolders(response.data);
-            if (response.data.length > 0 && !selectedFolderId) {
-                setSelectedFolderId(response.data[0].id);
-            }
-        } catch (err) {
-            console.error('Failed to fetch folders');
-        }
-    };
+    // const fetchFolders = async () => {
+    //     try {
+    //         const response = await api.get('/imagefolders');
+    //         setFolders(response.data);
+    //         if (response.data.length > 0 && !selectedFolderId) {
+    //             setSelectedFolderId(response.data[0].id);
+    //         }
+    //     } catch (err) {
+    //         console.error('Failed to fetch folders');
+    //     }
+    // };
 
     const handleCreateFolder = async () => {
         if (!newFolderTitle.trim()) return;
         setLoading(true);
         try {
-            const response = await api.post('/images', { title: newFolderTitle, adminId: clientId });
+            const response = await api.post(`/imagefolders`, { title: newFolderTitle, adminId: clientId });
             setFolders([response.data, ...folders]);
             setSelectedFolderId(response.data.id);
             setIsCreatingFolder(false);
@@ -61,7 +61,7 @@ const CreateImageModal = ({ isOpen, onClose, onSuccess, clientId }) => {
         try {
             const data = new FormData();
             data.append('image', file);
-            await api.post(`/images/${selectedFolderId}/images`, data);
+            await api.post(`/imagefolders/${selectedFolderId}/`, data);
             onSuccess();
             onClose();
             setFile(null);

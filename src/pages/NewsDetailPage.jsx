@@ -3,8 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { format } from 'date-fns';
 
+import { slugify } from '../utils/slugify';
+
 const NewsDetailPage = () => {
-    const { id, slug } = useParams();
+    const { companySlug, slug } = useParams();
     const navigate = useNavigate();
     const [news, setNews] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -12,8 +14,22 @@ const NewsDetailPage = () => {
     useEffect(() => {
         const fetchNews = async () => {
             try {
-                const response = await api.get(`/news/${slug}`);
-                setNews(response.data);
+                // Resolve companySlug to userId
+                const adminsResponse = await api.get('/admins');
+                const client = adminsResponse.data.find(c => slugify(c.company_name) === companySlug);
+
+                if (!client) {
+                    setNews(null);
+                    setLoading(false); // Ensure loading state is cleared if client not found
+                    return;
+                }
+
+                const response = await api.get(`/news`);
+                const foundNews = response.data.find(n =>
+                    n.slug === slug &&
+                    (n.userId === client.id || n.user?.id === client.id)
+                );
+                setNews(foundNews);
             } catch (error) {
                 console.error("Failed to fetch news:", error);
             } finally {
@@ -21,7 +37,7 @@ const NewsDetailPage = () => {
             }
         };
         fetchNews();
-    }, [slug]);
+    }, [companySlug, slug]);
 
     const getValidImageUrl = (url) => {
         if (!url) return null;
@@ -45,7 +61,7 @@ const NewsDetailPage = () => {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
                 <h2 className="text-2xl font-bold text-slate-800">News article not found</h2>
-                <button onClick={() => navigate(-1)} className="btn-secondary">Go Back</button>
+                <button onClick={() => navigate(`/${companySlug}/news`)} className="btn-secondary">Go Back</button>
             </div>
         );
     }
@@ -57,7 +73,7 @@ const NewsDetailPage = () => {
         <div className="min-h-screen bg-slate-50/30">
             <div className="max-w-4xl mx-auto px-6 py-12">
                 <button
-                    onClick={() => navigate(-1)}
+                    onClick={() => navigate(`/${companySlug}/news`)}
                     className="mb-8 flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors font-bold text-xs uppercase tracking-widest"
                 >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>

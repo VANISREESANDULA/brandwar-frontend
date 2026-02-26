@@ -61,15 +61,22 @@ function App() {
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="clients" element={<Clients />} />
-              <Route path="clients/:id" element={<ClientView />} />
               <Route path="add-client" element={<AddClient />} />
               <Route path="clients/:id/edit" element={<AddClient />} />
               <Route path="requests" element={<Requests />} />
               <Route path="previous-clients" element={<PreviousClients />} />
               <Route path="profile" element={<Profile />} />
-              <Route path="clients/:id/blogs/:slug" element={<BlogDetailPage />} />
-              <Route path="clients/:id/news/:slug" element={<NewsDetailPage />} />
-              <Route path="clients/:id/gallery/:type/:folderId/:folderTitle" element={<GalleryFolderPage />} />
+
+              {/* Company Slug Routing - Root-level within Layout */}
+              <Route path=":companySlug" element={<ClientView />} />
+              <Route path=":companySlug/blogs" element={<ClientView forceModule="blogs" />} />
+              <Route path=":companySlug/blogs/:slug" element={<BlogDetailPage />} />
+
+              <Route path=":companySlug/news" element={<ClientView forceModule="news" />} />
+              <Route path=":companySlug/news/:slug" element={<NewsDetailPage />} />
+
+              <Route path=":companySlug/gallery/:type" element={<ClientView forceModule="gallery" />} />
+              <Route path=":companySlug/gallery/:type/:folderId/:folderTitle" element={<GalleryFolderPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

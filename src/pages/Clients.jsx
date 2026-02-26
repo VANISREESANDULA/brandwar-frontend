@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { slugify } from '../utils/slugify';
 import api from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
@@ -423,6 +424,7 @@ const Clients = () => {
                       <div className="flex gap-2">
                         {client.moduleBlog && (
                           <div
+                            onClick={() => navigate(`/${slugify(client.companyName)}/blogs`)}
                             className="w-8 h-8 rounded-lg flex items-center justify-center text-black text-sm font-semibold cursor-pointer hover:scale-110 transition-transform"
                             style={{ backgroundColor: client.blogColor }}
                             title="Blog"
@@ -432,6 +434,7 @@ const Clients = () => {
                         )}
                         {client.moduleNews && (
                           <div
+                            onClick={() => navigate(`/${slugify(client.companyName)}/news`)}
                             className="w-8 h-8 rounded-lg flex items-center justify-center text-black text-sm font-semibold cursor-pointer hover:scale-110 transition-transform"
                             style={{ backgroundColor: client.newsColor }}
                             title="News"
@@ -441,6 +444,7 @@ const Clients = () => {
                         )}
                         {client.moduleVideos && (
                           <div
+                            onClick={() => navigate(`/${slugify(client.companyName)}/gallery/videos`)}
                             className="w-8 h-8 rounded-lg flex items-center justify-center text-black text-sm font-semibold cursor-pointer hover:scale-110 transition-transform"
                             style={{ backgroundColor: client.videosColor }}
                             title="Videos"
@@ -450,6 +454,7 @@ const Clients = () => {
                         )}
                         {client.moduleImages && (
                           <div
+                            onClick={() => navigate(`/${slugify(client.companyName)}/gallery/images`)}
                             className="w-8 h-8 rounded-lg flex items-center justify-center text-black text-sm font-semibold cursor-pointer hover:scale-110 transition-transform"
                             style={{ backgroundColor: client.imagesColor }}
                             title="Images"
@@ -467,7 +472,7 @@ const Clients = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => navigate(`/clients/${client.id}`)}
+                          onClick={() => navigate(`/${slugify(client.companyName)}`)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           title="View"
                         >

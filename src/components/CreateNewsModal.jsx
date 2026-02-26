@@ -6,6 +6,7 @@ const CreateNewsModal = ({ isOpen, onClose, onSuccess, clientId, initialData }) 
         title: '',
         slug: '',
         keywords: '',
+        image: '',
         description: '',
     });
 
@@ -16,6 +17,7 @@ const CreateNewsModal = ({ isOpen, onClose, onSuccess, clientId, initialData }) 
                 slug: initialData.slug || '',
                 keywords: initialData.keywords || '',
                 description: initialData.description || '',
+                // image: initialData.image || '',
             });
             const imageBlock = initialData.contents?.find(c => c.type === 'image');
             if (imageBlock) {
@@ -26,6 +28,7 @@ const CreateNewsModal = ({ isOpen, onClose, onSuccess, clientId, initialData }) 
                 title: '',
                 slug: '',
                 keywords: '',
+                image: '',
                 description: '',
             });
             setImage(null);
@@ -119,10 +122,10 @@ const CreateNewsModal = ({ isOpen, onClose, onSuccess, clientId, initialData }) 
                 });
             }
 
+            onClose();
             setTimeout(() => {
                 onSuccess();
-                onClose();
-            }, 500);
+            }, 600);
 
             setFormData({ title: '', slug: '', keywords: '', description: '' });
             setImage(null);
