@@ -1,22 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '../utils/api';
 import { format } from 'date-fns';
+import api from '../utils/api';
 
 import { slugify } from '../utils/slugify';
+import { useAuth } from '../contexts/AuthContext';
 
 const BlogDetailPage = () => {
     const { companySlug, slug } = useParams();
     const navigate = useNavigate();
     const [blog, setBlog] = useState(null);
     const [loading, setLoading] = useState(true);
+    const { user, isSuperAdmin } = useAuth();
 
     useEffect(() => {
         const fetchBlog = async () => {
             try {
-                // Resolve companySlug to userId first
-                const adminsResponse = await api.get('/admins');
-                const client = adminsResponse.data.find(c => slugify(c.company_name) === companySlug);
+                let client;
+                if (isSuperAdmin) {
+                    const adminsResponse = await api.get('/admins');
+                    client = adminsResponse.data.find(c => slugify(c.company_name) === companySlug);
+                } else {
+                    client = user;
+                }
 
                 if (!client) {
                     setBlog(null);
@@ -45,7 +51,7 @@ const BlogDetailPage = () => {
             const cleanPath = url.split("uploads")[1].replace(/\\/g, "/");
             return `http://localhost:4000/uploads${cleanPath}`;
         }
-        return null;
+        return `http://localhost:4000/uploads/${url.replace(/\\/g, '/').replace(/^\/+/, '')}`;
     };
 
     if (loading) {

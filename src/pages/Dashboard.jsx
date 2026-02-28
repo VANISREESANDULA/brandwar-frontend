@@ -39,25 +39,36 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await api.get('/admins');
-        const allAdmins = response.data;
-        const active = allAdmins.filter(a => a.isActive).length;
-        const total = allAdmins.length;
-        const inactive = allAdmins.filter(a => !a.isActive && !a.isDeleted).length;
-        const hold = 0;
+        let active = 0, total = 0, inactive = 0, hold = 0;
 
-        // Fetch content counts
+        // Only superadmins are allowed to fetch the whole admins list
+        if (isSuperAdmin) {
+          const response = await api.get('/admins');
+          const allAdmins = response.data;
+          active = allAdmins.filter(a => a.isActive).length;
+          total = allAdmins.length;
+          inactive = allAdmins.filter(a => !a.isActive && !a.isDeleted).length;
+        }
+
+        // Fetch content counts (scoped to user due to backend endpoints)
         const [blogRes, newsRes, videoRes, imageRes] = await Promise.all([
-          api.get('/blogs'),
-          api.get('/news'),
-          api.get('/videofolders'),
-          api.get('/imagefolders')
+          api.get('/blogs', { params: { adminId: user?.id } }),
+          api.get('/news', { params: { adminId: user?.id } }),
+          api.get('/videofolders', { params: { adminId: user?.id } }),
+          api.get('/imagefolders', { params: { adminId: user?.id } })
         ]);
-        // console.log("blog", blogRes)
-        // console.log("new", newsRes)
-        // console.log("videos", videoRes)
-        // console.log("images", imageRes)
 
+        let blogs = blogRes.data;
+        let news = newsRes.data;
+        let videos = videoRes.data;
+        let images = imageRes.data;
+
+        if (!isSuperAdmin) {
+          blogs = blogs.filter(b => b.userId === user?.id || b.user?.id === user?.id);
+          news = news.filter(n => n.userId === user?.id || n.user?.id === user?.id);
+          videos = videos.filter(v => v.userId === user?.id || v.user?.id === user?.id);
+          images = images.filter(i => i.userId === user?.id || i.user?.id === user?.id);
+        }
 
         setStats({
           totalClients: total,
@@ -276,7 +287,7 @@ const Dashboard = () => {
       </div>
 
       {/* System Logs */}
-      <div className="stat-card">
+      {/* <div className="stat-card">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-bold text-slate-900">System Logs</h3>
           <button className="text-xs font-semibold text-blue-600 uppercase tracking-widest hover:underline">View All</button>
@@ -302,7 +313,7 @@ const Dashboard = () => {
             </div>
           ))}
         </div>
-      </div>
+      </div> */}
     </div>
   );
 };

@@ -63,30 +63,45 @@ const AddClient = () => {
     try {
       const isActive = formData.status === 'ACTIVE';
 
-      // Map params to snake_case for backend
-      const payload = {
-        ...formData,
-        isActive,
-        company_name: formData.companyName,
-        website: formData.websiteUrl,
-        name: formData.contactName,
-        contact_number: formData.phoneNumber,
-        primary_color: formData.primaryColor,
-        secondary_color: formData.secondaryColor,
-        allowBlogs: formData.moduleBlog,
-        allowNews: formData.moduleNews,
-        allowVideos: formData.moduleVideos,
-        allowImages: formData.moduleImages,
-      };
+      const payload = new FormData();
+      payload.append('isActive', isActive);
+      payload.append('company_name', formData.companyName || '');
+      payload.append('website', formData.websiteUrl || '');
+      payload.append('name', formData.contactName || '');
+      payload.append('contact_number', formData.phoneNumber || '');
+      payload.append('primary_color', formData.primaryColor || '');
+      payload.append('secondary_color', formData.secondaryColor || '');
+      payload.append('email', formData.email || '');
+      payload.append('address', formData.address || '');
 
-      console.log('Sending payload:', payload);
+      if (formData.password) {
+        payload.append('password', formData.password);
+      }
+
+      if (formData.logoFile) {
+        payload.append('logo', formData.logoFile);
+      }
+
+      payload.append('allowBlogs', !!formData.moduleBlog);
+      payload.append('allowNews', !!formData.moduleNews);
+      payload.append('allowVideos', !!formData.moduleVideos);
+      payload.append('allowImages', !!formData.moduleImages);
+
+      if (formData.startDate) payload.append('startDate', formData.startDate);
+      if (formData.endDate) payload.append('endDate', formData.endDate);
+
+      console.log('Sending payload:', Array.from(payload.entries()));
 
       if (isEditMode) {
         // Backend uses /admins/:id/update for PUT
-        await api.put(`/admins/${id}/update`, payload);
+        await api.put(`/admins/${id}/update`, payload, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
         setToast({ message: 'Client updated successfully!', type: 'success' });
       } else {
-        await api.post('/admins', payload);
+        await api.post('/admins', payload, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
         setToast({ message: 'Client created successfully!', type: 'success' });
       }
 

@@ -1,6 +1,15 @@
 import React from 'react';
 
-const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, twoStep = false }) => {
+const DeleteConfirmationModal = ({
+    isOpen,
+    onClose,
+    onConfirm,
+    title,
+    message,
+    twoStep = false,
+    step1Message,
+    step2Message
+}) => {
     const [step, setStep] = React.useState(1);
 
     React.useEffect(() => {
@@ -18,6 +27,14 @@ const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, t
         }
     };
 
+    const displayTitle = step === 2
+        ? (step2Message?.title || 'Final Confirmation')
+        : (step1Message?.title || title || 'Are you sure?');
+
+    const displayMessage = step === 2
+        ? (step2Message?.text || 'This action cannot be undone and data recovery is not possible.')
+        : (step1Message?.text || message || 'This action cannot be undone. Do you really want to proceed?');
+
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <div
@@ -32,18 +49,16 @@ const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, t
                     </div>
 
                     <h3 className="text-2xl font-bold text-slate-900 mb-2">
-                        {step === 2 ? 'Final Confirmation' : (title || 'Are you sure?')}
+                        {displayTitle}
                     </h3>
                     <p className="text-slate-500 font-medium">
-                        {step === 2
-                            ? 'This will permanently delete the folder and ALL items inside it. This cannot be undone!'
-                            : (message || 'This action cannot be undone. Do you really want to delete this item?')}
+                        {displayMessage}
                     </p>
                 </div>
 
                 <div className="flex border-t border-slate-100">
                     <button
-                        onClick={onClose}
+                        onClick={step === 2 ? () => setStep(1) : onClose}
                         className="flex-1 px-6 py-4 text-slate-500 font-bold uppercase tracking-widest text-xs hover:bg-slate-50 transition-colors border-r border-slate-100"
                     >
                         {step === 2 ? 'Back' : 'Cancel'}
@@ -52,7 +67,7 @@ const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, t
                         onClick={handleConfirm}
                         className={`flex-1 px-6 py-4 font-bold uppercase tracking-widest text-xs transition-colors ${step === 2 ? 'text-red-700 bg-red-50 hover:bg-red-100' : 'text-red-600 hover:bg-red-50'}`}
                     >
-                        {step === 2 ? 'Yes, Delete Everything' : (twoStep ? 'Understand & Proceed' : 'Yes, Delete')}
+                        {step === 2 ? (step2Message?.buttonText || 'Yes, Delete Everything') : (twoStep ? (step1Message?.buttonText || 'Understand & Proceed') : 'Yes, Delete')}
                     </button>
                 </div>
             </div>

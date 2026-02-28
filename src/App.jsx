@@ -16,6 +16,12 @@ import BlogDetailPage from './pages/BlogDetailPage';
 import NewsDetailPage from './pages/NewsDetailPage';
 import GalleryFolderPage from './pages/GalleryFolderPage';
 
+// Public Iframe Views
+import PublicBlogs from './pages/public/PublicBlogs';
+import PublicNews from './pages/public/PublicNews';
+import PublicVideos from './pages/public/PublicVideos';
+import PublicImages from './pages/public/PublicImages';
+
 // Theme Controller Component
 const ThemeController = ({ children }) => {
   const { user } = useAuth(); // Access user from context
@@ -49,6 +55,12 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
+
+            {/* Public Embedded Routes for iframes */}
+            <Route path="/public/:website/blogs" element={<PublicBlogs />} />
+            <Route path="/public/:website/news" element={<PublicNews />} />
+            <Route path="/public/:website/gallery/videos" element={<PublicVideos />} />
+            <Route path="/public/:website/gallery/images" element={<PublicImages />} />
 
             <Route
               path="/"

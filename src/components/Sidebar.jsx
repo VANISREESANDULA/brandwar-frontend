@@ -6,6 +6,16 @@ import { slugify } from '../utils/slugify';
 const Sidebar = ({ isOpen, onClose }) => {
   const { user, isSuperAdmin } = useAuth();
 
+  const getValidImageUrl = (url) => {
+    if (!url || url === "default-logo.png") return "/brandwar-01.png";
+    if (url.startsWith('http') || url.startsWith('data:')) return url;
+    if (url.includes('uploads')) {
+      const cleanPath = url.split('uploads')[1].replace(/\\/g, '/');
+      return `http://localhost:4000/uploads${cleanPath}`;
+    }
+    return `http://localhost:4000/uploads/${url.replace(/\\/g, '/').replace(/^\/+/, '')}`;
+  };
+
   const menuItems = isSuperAdmin ? [
     { path: '/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/clients', label: 'Clients', icon: '👥' },
@@ -15,9 +25,11 @@ const Sidebar = ({ isOpen, onClose }) => {
     { path: '/profile', label: 'Profile', icon: '👤' },
   ] : [
     { path: '/dashboard', label: 'Overview', icon: '📊' },
-    { path: `/${slugify(user?.company_name || '')}`, label: 'My Content', icon: '📝' },
-    { path: '/requests', label: 'Requests', icon: '📋' },
     { path: '/profile', label: 'Profile', icon: '👤' },
+    { path: `/${slugify(user?.company_name || '')}/blogs`, label: 'Blogs', icon: '📝' },
+    { path: `/${slugify(user?.company_name || '')}/news`, label: 'News', icon: '📰' },
+    { path: `/${slugify(user?.company_name || '')}/gallery/videos`, label: 'Videos', icon: '🎥' },
+    { path: `/${slugify(user?.company_name || '')}/gallery/images`, label: 'Images', icon: '🖼️' },
   ];
 
   return (
@@ -47,7 +59,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 <span className="text-2xl">⚡</span>
               </div> */}
               <img
-                src={user?.logo && user.logo !== "default-logo.png" ? user.logo : "/brandwar-01.png"}
+                src={getValidImageUrl(user?.logo)}
                 alt="Logo"
                 className="h-20 w-auto"
               />

@@ -4,7 +4,8 @@ const ClientForm = ({ initialData, onSubmit, loading, submitLoading, isEditMode,
     const [formData, setFormData] = useState({
         companyName: '',
         websiteUrl: '',
-        logo: '', // Store as base64 string
+        logo: '',
+        logoFile: null,
         primaryColor: '#3B82F6',
         secondaryColor: '#8B5CF6',
         contactName: '',
@@ -59,12 +60,24 @@ const ClientForm = ({ initialData, onSubmit, loading, submitLoading, isEditMode,
                 moduleImages: initialData.moduleImages || false,
                 imagesColor: initialData.imagesColor || '#10B981',
                 status: initialData.status || 'ACTIVE',
+                logoFile: null,
             });
         }
     }, [initialData]);
 
     const validateUrl = (url) => {
         return url && url.length > 0;
+    };
+
+    const getValidImageUrl = (url) => {
+        if (!url) return null;
+        if (url.startsWith('http')) return url;
+        if (url.startsWith('blob:')) return url; // preview url
+        if (url.includes('uploads')) {
+            const cleanPath = url.split('uploads')[1].replace(/\\/g, '/');
+            return `http://localhost:4000/uploads${cleanPath}`;
+        }
+        return null;
     };
 
     const handleImageUpload = (e) => {
@@ -75,12 +88,9 @@ const ClientForm = ({ initialData, onSubmit, loading, submitLoading, isEditMode,
                 return;
             }
 
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setFormData(prev => ({ ...prev, logo: reader.result }));
-                setErrors(prev => ({ ...prev, logo: '' }));
-            };
-            reader.readAsDataURL(file);
+            const previewUrl = URL.createObjectURL(file);
+            setFormData(prev => ({ ...prev, logo: previewUrl, logoFile: file }));
+            setErrors(prev => ({ ...prev, logo: '' }));
         }
     };
 
@@ -221,7 +231,7 @@ const ClientForm = ({ initialData, onSubmit, loading, submitLoading, isEditMode,
                     hover:file:bg-blue-100"
                             />
                             {formData.logo && (
-                                <img src={formData.logo} alt="Logo preview" className="h-12 w-auto object-contain border bg-slate-200 rounded p-1" />
+                                <img src={getValidImageUrl(formData.logo)} alt="Logo preview" className="h-12 w-auto object-contain border bg-slate-200 rounded p-1" />
                             )}
                         </div>
                         {errors.logo && <p className="text-red-600 text-sm mt-1">{errors.logo}</p>}

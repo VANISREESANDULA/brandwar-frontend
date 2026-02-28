@@ -1,162 +1,268 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
-import { format } from 'date-fns';
 import BlogListing from '../components/content/BlogListing';
 import NewsListing from '../components/content/NewsListing';
 import ContentDetailModal from '../components/ContentDetailModal';
 
 const Profile = () => {
-    const { user } = useAuth();
+    const { user, isSuperAdmin, login } = useAuth();
     const [userContent, setUserContent] = useState({ blogs: [], news: [] });
     const [loading, setLoading] = useState(true);
     const [selectedItem, setSelectedItem] = useState(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [editForm, setEditForm] = useState({});
+    const [toast, setToast] = useState('');
 
     useEffect(() => {
-        const fetchUserContent = async () => {
-            try {
-                const [blogsRes, newsRes] = await Promise.all([
-                    api.get('/blogs'),
-                    api.get('/news')
-                ]);
+        if (user) {
+            setEditForm({
+                name: user.name || '',
+                email: user.email || '',
+                phoneNumber: user.phoneNumber || user.contact_number || '',
+                ...(isSuperAdmin ? {
+                    company_name: user.company_name || user.companyName || '',
+                    website: user.website || '',
+                    address: user.address || '',
+                } : {})
+            });
 
-                const myBlogs = blogsRes.data.filter(b => (b.user?.id === user.id || b.userId === user.id));
-                const myNews = newsRes.data.filter(n => (n.user?.id === user.id || n.userId === user.id));
-
-                setUserContent({ blogs: myBlogs, news: myNews });
-            } catch (error) {
-                console.error("Failed to fetch user content:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        if (user) fetchUserContent();
+            const fetchUserContent = async () => {
+                try {
+                    const [blogsRes, newsRes] = await Promise.all([
+                        api.get('/blogs'),
+                        api.get('/news')
+                    ]);
+                    const myBlogs = blogsRes.data.filter(b => (b.user?.id === user.id || b.userId === user.id));
+                    const myNews = newsRes.data.filter(n => (n.user?.id === user.id || n.userId === user.id));
+                    setUserContent({ blogs: myBlogs, news: myNews });
+                } catch (error) {
+                    console.error('Failed to fetch user content:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fetchUserContent();
+        }
     }, [user]);
 
     const getValidImageUrl = (url) => {
-        if (!url) return null;
-        if (url.startsWith("http")) return url;
-        if (url.includes("uploads")) {
-            const cleanPath = url.split("uploads")[1].replace(/\\/g, "/");
+        if (!url || url === "default-logo.png") return "/brandwar-01.png";
+        if (url.startsWith('http') || url.startsWith('data:')) return url;
+        if (url.includes('uploads')) {
+            const cleanPath = url.split('uploads')[1].replace(/\\/g, '/');
             return `http://localhost:4000/uploads${cleanPath}`;
         }
-        return null;
+        return `http://localhost:4000/uploads/${url.replace(/\\/g, '/').replace(/^\/+/, '')}`;
+    };
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            const endpoint = isSuperAdmin ? `/admins/${user.id}` : `/admins/${user.id}`;
+            const res = await api.put(endpoint, editForm);
+            login({ ...user, ...res.data }, localStorage.getItem('token'));
+            setIsEditing(false);
+            setToast('Profile updated successfully!');
+            setTimeout(() => setToast(''), 3000);
+        } catch (err) {
+            console.error('Failed to save profile:', err);
+            setToast('Failed to update profile.');
+            setTimeout(() => setToast(''), 3000);
+        } finally {
+            setSaving(false);
+        }
     };
 
     if (!user) return null;
 
+    const logoUrl = getValidImageUrl(user.logo);
+    const avatarLetter = user.name?.charAt(0)?.toUpperCase() || 'U';
+
     return (
-        <div className="min-h-screen bg-[#f8fafc] p-4 md:p-8 lg:p-12 animate-fade-in">
-            <div className="max-w-7xl mx-auto space-y-12">
+        <div className="min-h-screen bg-[#f8fafc] p-4 md:p-8 lg:p-12">
+            <div className="max-w-5xl mx-auto space-y-10">
 
-                {/* Hero Profile Header */}
-                <div className="relative group">
-                    <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-[3rem] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
-                    <div className="relative bg-white rounded-[3rem] shadow-xl overflow-hidden border border-slate-100 flex flex-col md:flex-row">
-                        <div className="md:w-1/3 bg-slate-900 relative flex flex-col items-center justify-center p-12 overflow-hidden">
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
-                            <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-600/10 rounded-full -ml-32 -mb-32 blur-3xl"></div>
+                {/* Toast */}
+                {toast && (
+                    <div className="fixed top-6 right-6 z-50 px-6 py-4 bg-slate-900 text-white rounded-2xl shadow-2xl text-sm font-bold">
+                        {toast}
+                    </div>
+                )}
 
-                            <div className="relative z-10 text-center">
-                                <div className="w-32 h-32 rounded-3xl bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center text-5xl font-black text-white shadow-2xl mb-6 mx-auto transform hover:rotate-6 transition-transform">
-                                    {user.name?.charAt(0) || 'U'}
-                                </div>
-                                <h1 className="text-3xl font-black text-white tracking-tight mb-2">{user.name}</h1>
-                                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-400 text-[10px] font-black uppercase tracking-[0.2em]">
-                                    <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
-                                    {user.role}
-                                </div>
+                {/* Profile Card */}
+                <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+                    {/* Header */}
+                    <div className="bg-slate-900/50 px-10 py-8 flex items-center gap-8">
+                        {/* Avatar - always letter-based */}
+                        <div className="flex-shrink-0">
+                            <div className="w-32 h-32 rounded-2xl flex items-center border bg-white justify-center text-5xl font-black text-slate-800 shadow-lg overflow-hidden">
+                                <img
+                                    src={getValidImageUrl(user.logo)}
+                                    alt={`${user.name} Logo`}
+                                    className="w-full h-full object-contain p-3"
+                                    style={{ display: getValidImageUrl(user.logo) ? 'block' : 'none' }}
+                                    onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.style.display = 'none';
+                                        if (e.target.nextElementSibling) {
+                                            e.target.nextElementSibling.style.display = 'block';
+                                        }
+                                    }}
+                                />
+                                <span style={{ display: getValidImageUrl(user.logo) ? 'none' : 'block' }}>
+                                    {avatarLetter}
+                                </span>
                             </div>
                         </div>
+                        <div className="flex-1 min-w-0">
+                            <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight truncate">
+                                {user.name}
+                            </h1>
+                            <div className="flex items-center gap-3 mt-2 flex-wrap">
+                                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-600/20 border border-blue-600/30 text-blue-600 text-[10px] font-black uppercase tracking-[0.2em]">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
+                                    {user.role}
+                                </span>
+                                {isSuperAdmin && (
+                                    <span className="text-white/50 text-xs font-bold truncate">
+                                        {user.company_name || user.companyName || 'Brandwar Ecosystem'}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        {/* <button
+                            onClick={() => isEditing ? setIsEditing(false) : setIsEditing(true)}
+                            className="flex-shrink-0 flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                        >
+                            {isEditing ? (
+                                <>
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                    Cancel
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                    Edit Profile
+                                </>
+                            )}
+                        </button> */}
+                    </div>
 
-                        <div className="flex-1 p-8 md:p-12">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                                <div className="space-y-8">
-                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 pb-4">Core Identity</h3>
-                                    <div className="grid grid-cols-1 gap-6">
-                                        <InfoItem label="Legal Name" value={user.name} />
-                                        <InfoItem label="Email Address" value={user.email} />
-                                        <InfoItem label="Phone Line" value={user.phoneNumber} />
-                                    </div>
+                    {/* Body */}
+                    <div className="p-8 md:p-10">
+                        {isEditing ? (
+                            /* --- EDIT MODE --- */
+                            <div className="space-y-6">
+                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Edit Your Info</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <FormField label="Full Name" value={editForm.name} onChange={v => setEditForm(f => ({ ...f, name: v }))} />
+                                    <FormField label="Email Address" value={editForm.email} onChange={v => setEditForm(f => ({ ...f, email: v }))} type="email" />
+                                    <FormField label="Phone Number" value={editForm.phoneNumber} onChange={v => setEditForm(f => ({ ...f, phoneNumber: v }))} />
+                                    {isSuperAdmin && (
+                                        <>
+                                            <FormField label="Company Name" value={editForm.company_name} onChange={v => setEditForm(f => ({ ...f, company_name: v }))} />
+                                            <FormField label="Website" value={editForm.website} onChange={v => setEditForm(f => ({ ...f, website: v }))} />
+                                            <FormField label="Address" value={editForm.address} onChange={v => setEditForm(f => ({ ...f, address: v }))} />
+                                        </>
+                                    )}
                                 </div>
-                                <div className="space-y-8">
-                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 pb-4">Business & Stats</h3>
-                                    <div className="grid grid-cols-1 gap-6">
-                                        <InfoItem label="Company" value={user.companyName || 'Brandwar Ecosystem'} />
-                                        <div className="space-y-2">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Global Prowess</p>
-                                            <div className="flex gap-4">
-                                                <div className="flex-1 bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                                                    <p className="text-2xl font-black text-slate-900">{userContent.blogs.length}</p>
-                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Blogs</p>
-                                                </div>
-                                                <div className="flex-1 bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                                                    <p className="text-2xl font-black text-slate-900">{userContent.news.length}</p>
-                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Updates</p>
-                                                </div>
-                                            </div>
+                                <div className="flex justify-end pt-4">
+                                    <button
+                                        onClick={handleSave}
+                                        disabled={saving}
+                                        className="px-8 py-3 bg-slate-900 text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-blue-700 transition-all disabled:opacity-50"
+                                    >
+                                        {saving ? 'Saving...' : 'Save Changes'}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            /* --- VIEW MODE --- */
+                            isSuperAdmin ? (
+                                /* SUPER ADMIN: Full company details */
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                    <div className="space-y-8">
+                                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 pb-4">Personal Info</h3>
+                                        <div className="space-y-6">
+                                            <InfoItem label="Full Name" value={user.name} />
+                                            <InfoItem label="Email Address" value={user.email} />
+                                            <InfoItem label="Phone Number" value={user.phoneNumber || user.contact_number} />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-8">
+                                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 pb-4">Company Details</h3>
+                                        <div className="space-y-6">
+                                            <InfoItem label="Company Name" value={user.company_name || user.companyName} />
+                                            <InfoItem label="Website" value={user.website} />
+                                            <InfoItem label="Address" value={user.address} />
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
+                            ) : (
+                                /* ADMIN: Just personal info */
+                                <div className="max-w-lg space-y-8">
+                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 pb-4">Profile Information</h3>
+                                    <div className="space-y-6">
+                                        <InfoItem label="Full Name" value={user.name} />
+                                        <InfoItem label="Email Address" value={user.email} />
+                                        <InfoItem label="Phone Number" value={user.phoneNumber || user.contact_number} />
+                                    </div>
+                                </div>
+                            )
+                        )}
                     </div>
                 </div>
 
-                {/* Content Sections */}
-                <div className="grid grid-cols-1 gap-12 pt-6">
-                    {/* Blogs Section */}
-                    {user.allowBlogs && (
-                        <ContentSection
-                            title="My Published Blogs"
-                            icon="📝"
-                            color="blue"
-                            loading={loading}
-                            items={userContent.blogs}
-                            renderItem={(item) => (
-                                <BlogListing
-                                    key={item.id}
-                                    item={item}
-                                    getValidImageUrl={getValidImageUrl}
-                                    onDetails={(i) => { setSelectedItem(i); setIsDetailOpen(true); }}
-                                    onEdit={() => { }} // Disabled in profile for now
-                                    onDelete={() => { }}
-                                />
-                            )}
-                        />
-                    )}
-
-                    {/* News Section */}
-                    {user.allowNews && (
-                        <ContentSection
-                            title="My Press Releases"
-                            icon="📰"
-                            color="red"
-                            loading={loading}
-                            items={userContent.news}
-                            renderItem={(item) => (
-                                <NewsListing
-                                    key={item.id}
-                                    item={item}
-                                    getValidImageUrl={getValidImageUrl}
-                                    onDetails={(i) => { setSelectedItem(i); setIsDetailOpen(true); }}
-                                    onEdit={() => { }}
-                                    onDelete={() => { }}
-                                />
-                            )}
-                        />
-                    )}
-                </div>
+                {/* Published Content — Admin only */}
+                {!isSuperAdmin && (user.allowBlogs || user.allowNews) && (
+                    <div className="space-y-10">
+                        {user.allowBlogs && (
+                            <ContentSection
+                                title="My Published Blogs"
+                                icon="📝"
+                                loading={loading}
+                                items={userContent.blogs}
+                                renderItem={(item) => (
+                                    <BlogListing
+                                        key={item.id}
+                                        item={item}
+                                        getValidImageUrl={getValidImageUrl}
+                                        onDetails={(i) => { setSelectedItem(i); setIsDetailOpen(true); }}
+                                        onEdit={() => { }}
+                                        onDelete={() => { }}
+                                    />
+                                )}
+                            />
+                        )}
+                        {user.allowNews && (
+                            <ContentSection
+                                title="My Press Releases"
+                                icon="📰"
+                                loading={loading}
+                                items={userContent.news}
+                                renderItem={(item) => (
+                                    <NewsListing
+                                        key={item.id}
+                                        item={item}
+                                        getValidImageUrl={getValidImageUrl}
+                                        onDetails={(i) => { setSelectedItem(i); setIsDetailOpen(true); }}
+                                        onEdit={() => { }}
+                                        onDelete={() => { }}
+                                    />
+                                )}
+                            />
+                        )}
+                    </div>
+                )}
             </div>
 
-            <ContentDetailModal
-                isOpen={isDetailOpen}
-                onClose={() => setIsDetailOpen(false)}
-                item={selectedItem}
-                type={selectedItem?.slug ? 'blog' : 'news'}
-            />
         </div>
     );
 };
@@ -164,25 +270,34 @@ const Profile = () => {
 const InfoItem = ({ label, value }) => (
     <div className="space-y-1">
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
-        <p className="text-slate-900 font-extrabold text-sm">{value || 'Not Configured'}</p>
+        <p className="text-slate-900 font-extrabold text-sm">{value || <span className="text-slate-300 font-medium">Not configured</span>}</p>
     </div>
 );
 
-const ContentSection = ({ title, icon, color, loading, items, renderItem }) => (
+const FormField = ({ label, value, onChange, type = 'text' }) => (
+    <div className="space-y-2">
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
+        <input
+            type={type}
+            value={value || ''}
+            onChange={e => onChange(e.target.value)}
+            className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-slate-900 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition-all"
+        />
+    </div>
+);
+
+const ContentSection = ({ title, icon, loading, items, renderItem }) => (
     <div className="space-y-6">
-        <div className="flex items-center justify-between px-4">
+        <div className="flex items-center justify-between px-2">
             <h2 className="text-xl font-black text-slate-900 flex items-center gap-4">
-                <span className={`w-10 h-10 rounded-2xl bg-${color}-50 flex items-center justify-center text-xl shadow-sm`}>{icon}</span>
+                <span className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center text-xl shadow-sm">{icon}</span>
                 {title}
             </h2>
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total: {items.length}</span>
         </div>
-
         {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {[1, 2, 3].map(i => (
-                    <div key={i} className="aspect-video bg-white rounded-3xl border border-slate-100 animate-pulse"></div>
-                ))}
+                {[1, 2, 3].map(i => <div key={i} className="aspect-video bg-white rounded-3xl border border-slate-100 animate-pulse" />)}
             </div>
         ) : items.length === 0 ? (
             <div className="bg-white rounded-[2.5rem] p-20 border border-slate-100 text-center">
@@ -197,4 +312,3 @@ const ContentSection = ({ title, icon, color, loading, items, renderItem }) => (
 );
 
 export default Profile;
-
